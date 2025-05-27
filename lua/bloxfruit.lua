@@ -20,12 +20,6 @@ local QuestSystem = {
     }
 }
 
-local function log(message)
-    if config.DebugMode then
-        print("[DEBUG] " .. message)
-    end
-end
-
 function QuestSystem:GetCurrentQuest()
     local playerLevel = LocalPlayer:FindFirstChild("Level") and LocalPlayer.Level.Value or 1
     for _, quest in ipairs(self.Quests) do
@@ -38,7 +32,7 @@ end
 
 function QuestSystem:AcceptQuest()
     if not self.CurrentQuest then return end
-    local npc = Workspace.NPCs:FindFirstChild(self.CurrentQuest.NPC)
+    local npc = Workspace:FindFirstChild("NPCs") and Workspace.NPCs:FindFirstChild(self.CurrentQuest.NPC)
     if npc then
         LocalPlayer.Character.HumanoidRootPart.CFrame = npc.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
         wait(1)
@@ -53,12 +47,15 @@ local CombatSystem = {
 function CombatSystem:FindNearestEnemy()
     local closest = nil
     local maxDist = config.AttackDistance
-    for _, enemy in ipairs(Workspace.Enemies:GetChildren()) do
-        if QuestSystem.CurrentQuest and enemy.Name == QuestSystem.CurrentQuest.Enemy and enemy:FindFirstChild("HumanoidRootPart") then
-            local dist = (Character.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
-            if dist < maxDist then
-                closest = enemy
-                maxDist = dist
+    local enemies = Workspace:FindFirstChild("Enemies")
+    if enemies then
+        for _, enemy in ipairs(enemies:GetChildren()) do
+            if QuestSystem.CurrentQuest and enemy.Name == QuestSystem.CurrentQuest.Enemy and enemy:FindFirstChild("HumanoidRootPart") then
+                local dist = (HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+                if dist < maxDist then
+                    closest = enemy
+                    maxDist = dist
+                end
             end
         end
     end
@@ -76,22 +73,39 @@ end
 local FlySystem = {}
 
 function FlySystem:MaintainPosition(target)
-    local root = Character.HumanoidRootPart
     local targetPos = target.HumanoidRootPart.Position + Vector3.new(0, config.FlyHeight, 0)
-    root.CFrame = CFrame.new(root.Position:Lerp(targetPos, 0.1))
+    HumanoidRootPart.CFrame = CFrame.new(HumanoidRootPart.Position:Lerp(targetPos, 0.1))
 end
 
 local running = false
 
 local function AutoFarm()
-    running = true
-    while running and wait() do
+    while running do
         QuestSystem:GetCurrentQuest()
-        if not QuestSystem.CurrentQuest then continue end
-        CombatSystem.Target = CombatSystem:FindNearestEnemy()
-        if CombatSystem.Target then
-            FlySystem:MaintainPosition(CombatSystem.Target)
-            CombatSystem:MeleeAttack()
+        if QuestSystem.CurrentQuest then
+            QuestSystem:AcceptQuest()
+            local questCompleted = false
+            local defeated = 0
+            while not questCompleted and running do
+                local enemy = CombatSystem:FindNearestEnemy()
+                if enemy then
+                    FlySystem:MaintainPosition(enemy)
+                    CombatSystem.Target = enemy
+                    CombatSystem:MeleeAttack()
+                    wait(config.AttackDelay)
+                    if not enemy.Parent then
+                        defeated = defeated + 1
+                    end
+                else
+                    wait(0.5)
+                end
+                if defeated >= QuestSystem.CurrentQuest.Required then
+                    QuestSystem.CurrentQuest = nil
+                    questCompleted = true
+                end
+            end
+        else
+            wait(1)
         end
     end
 end
@@ -106,13 +120,12 @@ Button.TextColor3 = Color3.new(1, 1, 1)
 Button.TextScaled = true
 
 Button.MouseButton1Click:Connect(function()
-    if not running then
-        QuestSystem:AcceptQuest()
-        AutoFarm()
+    running = not running
+    if running then
         Button.Text = "AutoFarm Ativo"
         Button.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        spawn(AutoFarm)
     else
-        running = false
         Button.Text = "Ativar AutoFarm"
         Button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
     end
