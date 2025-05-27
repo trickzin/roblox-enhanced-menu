@@ -4,7 +4,7 @@
 
 ### Método 1: Link Direto (Recomendado)
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/trickzqw/roblox-enhanced-menu/main/lua/executor.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/trickzin/roblox-enhanced-menu/main/lua/executor.lua"))()
 ```
 
 ### Método 2: Carregamento Manual
